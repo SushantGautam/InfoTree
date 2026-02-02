@@ -25,39 +25,15 @@ A Python library that transforms raw, unstructured text into navigable semantic 
 ```bash
 pip install git+https://github.com/SushantGautam/InfoTree.git
 ```
+or 
 
-
-## Quick Start
-
-```python
-from infotree import InfoTreePipeline, InfoTreeConfig
-
-# Configure pipeline
-config = InfoTreeConfig(
-    api_key="your-openai-api-key",
-    model="gpt-4o-mini",
-    window_chars=6000,
-    overlap_chars=800,
-    max_children=10,
-    max_depth=4
-)
-
-# Create pipeline
-pipeline = InfoTreePipeline(config)
-
-# Process text
-text = "Your long unstructured text here..."
-tree = pipeline.process(text)
-
-# Export to JSON
-pipeline.export_tree(tree, "output.json")
-
-# Print tree structure
-pipeline.print_tree(tree, max_depth=3)
+Super Quick run with UV:
+```bash
+uv run --with https://github.com/SushantGautam/InfoTree.git infotree process input.txt -o output.json --print-tree
 ```
 
-## Command-Line Interface
 
+## Quickstart with Command-Line Interface
 InfoTree includes a powerful CLI for easy command-line usage:
 
 ```bash
@@ -89,6 +65,36 @@ infotree export output.json -f html -o output.html
 ```
 
 See [CLI_EXAMPLES.sh](CLI_EXAMPLES.sh) for more examples.
+
+
+## Python API
+
+```python
+from infotree import InfoTreePipeline, InfoTreeConfig
+
+# Configure pipeline
+config = InfoTreeConfig(
+    api_key="your-openai-api-key",
+    model="gpt-4o-mini",
+    window_chars=6000,
+    overlap_chars=800,
+    max_children=10,
+    max_depth=4
+)
+
+# Create pipeline
+pipeline = InfoTreePipeline(config)
+
+# Process text
+text = "Your long unstructured text here..."
+tree = pipeline.process(text)
+
+# Export to JSON
+pipeline.export_tree(tree, "output.json")
+
+# Print tree structure
+pipeline.print_tree(tree, max_depth=3)
+```
 
 ## Architecture
 
