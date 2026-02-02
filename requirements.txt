@@ -1,0 +1,9 @@
+openai
+numpy
+scikit-learn
+scipy
+tenacity
+pydantic
+tiktoken
+python-dotenv
+tqdm
