@@ -15,6 +15,7 @@ setup(
         "pydantic>=2.0.0",
         "tiktoken>=0.5.0",
         "python-dotenv>=1.0.0",
+        "chonkie[genie]>=1.5.5",
     ],
     entry_points={
         "console_scripts": [
