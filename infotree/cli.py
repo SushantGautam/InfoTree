@@ -87,7 +87,7 @@ def get_config_from_args(args) -> InfoTreeConfig:
     }
     
 
-    genie = OpenAIGenie(model=os.getenv("MODEL_NAME", "gpt-4o-mini"), base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"), api_key=os.getenv("OPENAI_API_KEY"))
+    genie = OpenAIGenie(model=model, base_url=args.base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"), api_key=api_key)
     
     custom_rules = RecursiveRules([
         RecursiveLevel(
