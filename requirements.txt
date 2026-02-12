@@ -7,3 +7,4 @@ pydantic
 tiktoken
 python-dotenv
 tqdm
+chonkie[genie]

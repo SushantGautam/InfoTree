@@ -12,6 +12,18 @@ from .clustering import HierarchicalClusterer
 from .labeling import NodeLabeler
 from .validation import TreeValidator
 
+from .models import Window
+chunks_to_leafNode = lambda chunks: [
+    LeafNode(
+        node_id=f"leaf_{i}",
+        start=c.start_index,
+        end=c.end_index,
+        text=c.text.replace("\n", " "),
+        label=None,
+        embedding=None,
+    )
+    for i, c in enumerate(chunks)
+]
 
 class InfoTreePipeline:
     """Main pipeline for building information trees."""
@@ -53,12 +65,13 @@ class InfoTreePipeline:
         
         # Step 1: Create windows
         print("\n[1/7] Creating windows...")
-        windows = self.windower.create_windows(text)
-        print(f"  ✓ Created {len(windows)} windows")
-        
+        # windows = self.windower.create_windows(text)
+        # print(f"  ✓ Created {len(windows)} windows")
+        chunks = self.config.chunker(text)
         # Step 2: Extract nodes from windows
         print("\n[2/7] Extracting nodes from windows...")
-        all_nodes = self.extractor.extract_nodes_from_windows(windows, text)
+        all_nodes = chunks_to_leafNode(chunks.chunks)
+        # all_nodes = self.extractor.extract_nodes_from_windows(windows, text)
         print(f"  ✓ Extracted {len(all_nodes)} raw nodes")
         
         # Step 3: Deduplicate nodes
@@ -151,7 +164,7 @@ class InfoTreePipeline:
         tree_dict = tree.to_dict()
         
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(tree_dict, f, indent=2, ensure_ascii=False)
+            json.dump(tree_dict, f, indent=2, ensure_ascii=False, default=str)
     
     def print_tree(self, tree: InfoTree, max_depth: Optional[int] = None):
         """Print tree structure in readable format.

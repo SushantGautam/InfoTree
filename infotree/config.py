@@ -45,6 +45,7 @@ class InfoTreeConfig(BaseModel):
     
     # Parallel processing
     max_concurrent_requests: int = Field(default=10, description="Maximum concurrent async API requests")
+    chunker: object = Field(..., description="Chunker instance for text chunking")
     
     @field_validator("overlap_chars")
     @classmethod

@@ -5,6 +5,8 @@ import json
 import os
 import sys
 from pathlib import Path
+from chonkie.genie import OpenAIGenie
+from chonkie import SlumberChunker, RecursiveRules, RecursiveLevel, Pipeline
 
 try:
     from dotenv import load_dotenv
@@ -84,6 +86,50 @@ def get_config_from_args(args) -> InfoTreeConfig:
         'max-concurrent-requests': 10,
     }
     
+
+    genie = OpenAIGenie(model=os.getenv("MODEL_NAME", "gpt-4o-mini"), base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"), api_key=os.getenv("OPENAI_API_KEY"))
+    
+    custom_rules = RecursiveRules([
+        RecursiveLevel(
+            delimiters="\n\n",
+            include_delim="next"
+        ),
+        RecursiveLevel(
+            delimiters=[". ", "! ", "? ", ".\n", "!\n", "?\n"],
+            include_delim="prev"   # keep the punctuation with the sentence that ended
+        ),
+        RecursiveLevel(
+            delimiters="\n",
+            include_delim="next"
+        ),
+        RecursiveLevel(
+            delimiters=None,
+            whitespace=True
+        )
+    ])
+    refine_rules = RecursiveRules(
+                levels=[
+                    RecursiveLevel(delimiters=["\n\n"], include_delim="prev"),
+                    RecursiveLevel(delimiters=["."], include_delim="prev"),
+                    RecursiveLevel(whitespace=True)
+                ]
+            )
+
+    chunker = lambda text_doc: (
+        Pipeline()
+        .chunk_with(
+            "slumber",
+            genie=genie,
+            tokenizer="character",
+            chunk_size=1024,
+            rules=custom_rules,
+            candidate_size=128,
+            min_characters_per_chunk=64,
+            verbose=True,
+        ).run(texts=text_doc)
+    )
+
+
     config = InfoTreeConfig(
         api_key=api_key,
         base_url=args.base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
@@ -104,6 +150,7 @@ def get_config_from_args(args) -> InfoTreeConfig:
         retry_delay=get_float_env("RETRY_DELAY", args.retry_delay),
         embedding_batch_size=get_int_env("EMBEDDING_BATCH_SIZE", args.embedding_batch_size),
         max_concurrent_requests=get_int_env("MAX_CONCURRENT_REQUESTS", getattr(args, 'max_concurrent_requests', 10)),
+        chunker=chunker
     )
     return config
 
@@ -237,10 +284,44 @@ def cmd_export(args):
     with open(args.input, "r", encoding="utf-8") as f:
         tree_dict = json.load(f)
     
+    # Helper function to reconstruct original text from leaves if not available
+    def get_original_text():
+        # reconstruct from leaves by concatenating in sort order
+        text_length = tree_dict.get("metadata", {}).get("text_length", 0)
+        leaves = []
+        def collect_leaves(node):
+            if node.get("type") == "leaf":
+                leaves.append(node)
+            elif node.get("type") == "internal" and "children" in node:
+                for child in node["children"]:
+                    collect_leaves(child)
+        
+        collect_leaves(tree_dict["root"])
+        
+        if not leaves:
+            return ""
+        
+        # Sort leaves by their start position to ensure correct order
+        leaves_sorted = sorted(leaves, key=lambda x: x.get("start", 0))
+        
+        # Build text by joining leaf texts (they should be contiguous)
+        reconstructed = []
+        for leaf in leaves_sorted:
+            text = leaf.get("text", "")
+            reconstructed.append(text)
+        
+        result = ''.join(reconstructed)
+        
+        # Pad with spaces if needed to match text_length
+        if text_length > 0 and len(result) < text_length:
+            result += ' ' * (text_length - len(result))
+        
+        return result[:text_length] if text_length > 0 else result
+    
     if args.format == "json":
         output_path = args.output or args.input.replace(".json", "_formatted.json")
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(tree_dict, f, indent=2, ensure_ascii=False)
+            json.dump(tree_dict, f, indent=2, ensure_ascii=False, default=str)
         print(f"Exported to: {output_path}")
     
     elif args.format == "csv":
@@ -276,6 +357,13 @@ def cmd_export(args):
 
     elif args.format == "html":
         output_path = args.output or args.input.replace(".json", ".html")
+
+        # Ensure original_text is in metadata for HTML visualization
+        original_text = get_original_text()
+        if "metadata" not in tree_dict:
+            tree_dict["metadata"] = {}
+        if "original_text" not in tree_dict["metadata"] and original_text:
+            tree_dict["metadata"]["original_text"] = original_text
 
         def _safe_json_for_html(data):
             json_str = json.dumps(data, ensure_ascii=False)
@@ -505,7 +593,13 @@ def cmd_export(args):
             return '';
         }}
         
-        const fullDocumentText = extractFullText(root);
+        // Use original text from metadata if available, otherwise reconstruct from leaves
+        let fullDocumentText = '';
+        if (data.metadata && data.metadata.original_text) {{
+            fullDocumentText = data.metadata.original_text;
+        }} else {{
+            fullDocumentText = extractFullText(root);
+        }}
         
         function showContextAroundRanges(ranges) {{
             if (!ranges || ranges.length === 0) {{
